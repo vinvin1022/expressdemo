@@ -1,5 +1,6 @@
 var express = require("express");
 var app = express();
+let aboutData = require("./lib/fortune.js")
 let handles = require("express3-handlebars").create({"defaultLayout":"main"});
 app.engine('handlebars',handles.engine);
 app.set('view engine', 'handlebars');
@@ -12,12 +13,7 @@ app.get("/",function(req,res) {
     res.render("home");
 })
 app.get('/about', function(req, res) {
-    var about = [
-        "关于我们1",
-        "关于我们2"
-    ];
-    let index = Math.floor(Math.random()*about.length);
-    res.render("about",{aboutData:about[index]})
+    res.render("about",{aboutData:aboutData.forune()})
 });
 
 app.use(function(req, res, next) {
