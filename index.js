@@ -16,12 +16,21 @@ app.use(express.static(__dirname + "/public"));
 //设置端口
 app.set("port",process.env.PORT || 3000);
 
+app.use(function(req, res, next) {
+    res.locals.showTests = app.get("env") !== "production" && 
+    req.query.test ==="1";
+    next();
+});
+
 //配置路由
 app.get("/",function(req,res) {
     res.render("home");
 })
 app.get('/about', function(req, res) {
-    res.render("about",{aboutData:aboutData.forune()})
+    res.render("about",{
+        aboutData:aboutData.forune(),
+        pageTestScript:"./qa/test-about.js"
+    })
 });
 
 app.use(function(req, res, next) {
