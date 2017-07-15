@@ -36,7 +36,7 @@ app.get('/about', function(req, res) {
 app.use(function(req, res, next) {
     res.type("text/html");
     res.status("404");
-    res.send("<h1 style='text-align:center'>没有找到相关页面！</h1>");
+    res.send("<h1 style='text-align:center;color:#ff0000'>没有找到相关页面！</h1>");
 });
 
 //监听端口
