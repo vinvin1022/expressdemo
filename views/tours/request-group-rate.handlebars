@@ -1,0 +1,14 @@
+<h1>Request Group Rate</h1>
+<form action="/tours/request-group-rate" method="post">
+    <input type="hidden" name="referrer"> 
+    <div>Name: <input type="text" id="fieldName" name="name"></div>
+    <div>Group size: <input type="text" name="groupSize"></div>
+    <div>Email: <input type="email" name="email"></div>
+    <input type="submit" value="Submit">
+</form>
+<div>提交来的数据：{{submitData.name}} ,{{submitData.groupSize}} ,{{submitData.email }}</div>
+<script>
+    $(function () {
+        $('input[name="referrer"]').val(document.referrer);
+    });
+</script>
