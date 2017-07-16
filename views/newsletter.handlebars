@@ -1,26 +1,32 @@
 <h2>Sign up for our newsletter to receive news and specials!</h2>
 <div class="formContainer">
-<form class="form-horizontal newsletterForm" role="form" action="/process?form=newsletter" method="POST">
-    <input type="hidden" name="_csrf" value="{{csrf}}">
-    <div class="form-group">
-        <label for="fieldName" class="col-sm-2 control-label">Name</label>
-        <div class="col-sm-4">
-            <input type="text" class="form-control" id="fieldName" name="name">
+    <form class="form-horizontal newsletterForm" role="form" action="/process?form=newsletter" method="POST">
+        <input type="hidden" name="_csrf" value="{{csrf}}">
+        <div class="form-group">
+            <label for="fieldName" class="col-sm-2 control-label">Name</label>
+            <div class="col-sm-4">
+                <input type="text" class="form-control" id="fieldName" name="name">
+            </div>
         </div>
-    </div>
-    <div class="form-group">
-        <label for="fieldEmail" class="col-sm-2 control-label">Email</label>
-        <div class="col-sm-4">
-            <input type="email" class="form-control" required id="fieldName" name="email">
+        <div class="form-group">
+            <label for="fieldEmail" class="col-sm-2 control-label">Email</label>
+            <div class="col-sm-4">
+                <input type="email" class="form-control" required id="fieldName" name="email">
+            </div>
         </div>
-    </div>
-    <div class="form-group">
-        <div class="col-sm-offset-2 col-sm-4">
-            <button type="submit" class="btn btn-default">Register</button>
+        <div class="form-group">
+            <div class="col-sm-offset-2 col-sm-4">
+                <button type="submit" class="btn btn-default">Register</button>
+            </div>
         </div>
-    </div>
-</form>
+    </form>
 </div>
+{{#if flash}}
+<div class="alert alert-dismissible alert-{{flash.type}}">
+    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;<button>
+<strong>{{flash.intro}}</strong> {{{flash.message}}}
+</div>
+{{/if}}
 
 <script>
     $(document).ready(function () {
@@ -29,14 +35,14 @@
             var action = $(this).attr('action');
             var $container = $(this).closest('.formContainer');
             var data = {
-                _csrf:$("input[name='_csrf']").val(),
-                name:$("input[name='name']").val(),
-                email:$("input[name='email']").val()
+                _csrf: $("input[name='_csrf']").val(),
+                name: $("input[name='name']").val(),
+                email: $("input[name='email']").val()
             }
             console.log(data)
             $.ajax({
                 url: action,
-                data:data,
+                data: data,
                 type: 'POST',
                 success: function (data) {
                     if (data.success) {

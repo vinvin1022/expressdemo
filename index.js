@@ -6,6 +6,15 @@ var bodyParser = require("body-parser");
 //引入上传文件中间件
 var formidable = require('formidable');
 
+//引入cookie密钥
+var credentials = require('./credentials.js');
+
+//引入cookie中间件
+var cookieParser = require('cookie-parser');
+app.use(cookieParser(credentials.cookieSecret));
+
+app.use(require('express-session')());
+
 //引进about数据
 var aboutData = require("./lib/fortune.js");
 
@@ -13,7 +22,7 @@ var aboutData = require("./lib/fortune.js");
 var homeData = require("./lib/home.js");
 //引进天气数据
 var getWeatherData = require("./lib/weather.js");
-console.log(getWeatherData)
+
 
 //引入模板引擎
 var handles = require("express3-handlebars").create({
@@ -33,6 +42,15 @@ app.use(bodyParser());
 //设置端口
 app.set("port", process.env.PORT || 3000);
 
+
+app.use(function (req, res, next) {
+    // 如果有即显消息，把它传到上下文中，然后清除它
+    res.locals.flash = req.session.flash;
+    delete req.session.flash;
+    next();
+});
+
+//测试
 app.use(function (req, res, next) {
     res.locals.showTests = app.get("env") !== "production" &&
         req.query.test === "1";
@@ -49,35 +67,94 @@ app.use(function (req, res, next) {
 
 //配置路由
 app.get("/", function (req, res) {
+    res.cookie("islogin", "yes", {
+        httpOnly: true
+    });
+    res.cookie("signed_monster", "monmon", {
+        signed: true,
+        path: "/about"
+    });
     res.render("home", homeData.homeData);
 });
 app.get('/about', function (req, res) {
+    var cookie = req.signedCookies.signed_monster;
+    console.log(cookie, req.cookies);
     res.render("about", {
         aboutData: aboutData.forune(),
-        pageTestScript: "./qa/test-about.js"
+        pageTestScript: "./qa/test-about.js",
+        cookie: cookie ? "存在cookie:" + cookie : "不存在cookie"
     });
 });
 
-app.get('/newsletter', function(req, res) {
-    res.render("newsletter",{csrf: 'CSRF token goes here' });
+app.get('/newsletter', function (req, res) {
+    res.render("newsletter", {
+        csrf: 'CSRF token goes here'
+    });
+});
+
+app.post('/newsletter', function (req, res) {
+    var name = req.body.name || '',
+        email = req.body.email || '';
+    // 输入验证
+    console.log(email)
+    if (!email.match(VALID_EMAIL_REGEX)) {
+        if (req.xhr) return ;
+        res.json({
+            error: 'Invalid name email address.'
+        });
+        req.session.flash = {
+            type: 'danger',
+            intro: 'Validation error!',
+            message: 'The email address you entered was not valid.',
+        };
+        return res.redirect(303, '/newsletter/archive');
+    }
+    new NewsletterSignup({
+        name: name,
+        email: email
+    }).save(function (err) {
+        if (err) {
+            if (req.xhr) return ;
+            res.json({
+                error: 'Database error.'
+            });
+            req.session.flash = {
+                type: 'danger',
+                intro: 'Database error!',
+                message: 'There was a database error; please try again later.',
+            }
+            return res.redirect(303, '/thankyou');
+        }
+        if (req.xhr) return res.json({
+            success: true
+        });
+        req.session.flash = {
+            type: 'success',
+            intro: 'Thank you!',
+            message: 'You have now been signed up for the newsletter.',
+        };
+        return res.redirect(303, '/thankyou');
+    });
 });
 
 
-app.post('/process', function(req, res) {
+app.post('/process', function (req, res) {
     console.log('Form (from querystring): ' + req.query.form);
     console.log('CSRF token (from hidden form field): ' + req.body._csrf);
     console.log('Name (from visible form field): ' + req.body.name);
     console.log('Email (from visible form field): ' + req.body.email);
     console.info(req.accepts("json,html"));
     //res.type("json");
-    if(req.xhr || req.accepts("json,html") === "json"){
-        res.send({success:true});
-    }else{
+    if (req.xhr || req.accepts("json,html") === "json") {
+        res.send({
+            success: true
+        });
+    } else {
         res.redirect(303, '/thankyou');
     }
-    
+
 });
-app.get('/thankyou', function(req, res) {
+app.get('/thankyou', function (req, res) {
     res.render("thankyou");
 });
 
@@ -90,23 +167,24 @@ app.get('/tours/request-group-rate', function (req, res) {
 });
 app.post('/tours/request-group-rate', function (req, res) {
     var params = req.body;
-    res.render('tours/request-group-rate',{
-        submitData:params
+    res.render('tours/request-group-rate', {
+        submitData: params
     });
 });
 
 
-app.get('/contest/vacation-photo', function(req, res) {
+app.get('/contest/vacation-photo', function (req, res) {
     var now = new Date();
-    res.render("contest/vacation-photo",{
-        year: now.getFullYear(),month:now.getMonth()
+    res.render("contest/vacation-photo", {
+        year: now.getFullYear(),
+        month: now.getMonth()
     })
 });
 
-app.post('/contest/vacation-photo/:year/:month', function(req, res) {
+app.post('/contest/vacation-photo/:year/:month', function (req, res) {
     var form = new formidable.IncomingForm();
-    form.parse(req,function(err,fields,files){
-        if(err) return res.redirect(303, '/error');
+    form.parse(req, function (err, fields, files) {
+        if (err) return res.redirect(303, '/error');
         console.log('received fields:');
         console.log(fields);
         console.log('received files:');
