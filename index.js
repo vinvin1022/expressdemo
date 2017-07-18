@@ -1,7 +1,10 @@
-var express = require("express");
+﻿var express = require("express");
 var app = express();
 
+
+//引入body-parse中间件
 var bodyParser = require("body-parser");
+
 
 //引入上传文件中间件
 var formidable = require('formidable');
