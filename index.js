@@ -1,7 +1,47 @@
 ﻿var express = require("express");
 var app = express();
 
-///aaaaaaaaaaaaaaaa
+///用domain处理未捕获的错误
+app.use(function (req, res, next) {
+    // 为这个请求创建一个域
+    var domain = require('domain').create();
+    // 处理这个域中的错误
+    domain.on('error', function (err) {
+
+        console.error('DOMAIN ERROR CAUGHT\n', err.stack);
+        try {
+            // 在 5 秒内进行故障保护关机
+            setTimeout(function () {
+                console.error('Failsafe shutdown.');
+                process.exit(1);
+            }, 5000);
+            // 从集群中断开
+            var worker = require('cluster').worker;
+            if (worker) worker.disconnect();
+            // 停止接收新请求
+            server.close();
+            try {
+                // 尝试使用 Express 错误路由
+                next(err);
+            } catch (err) {
+                // 如果 Express 错误路由失效，尝试返回普通文本响应
+                console.error('Express error mechanism failed.\n', err.stack);
+                res.statusCode = 500;
+                res.setHeader('content-type', 'text/plain');
+                res.end('Server error.');
+            }
+        } catch (err) {
+            console.error('Unable to send 500 response.\n', err.stack);
+        }
+    });
+    // 向域中添加请求和响应对象
+    domain.add(req);
+    domain.add(res);
+    // 执行该域中剩余的请求链
+    domain.run(next);
+});
+
+var fs = require("fs");
 
 //引入body-parse中间件
 var bodyParser = require("body-parser");
@@ -45,6 +85,15 @@ app.use(bodyParser());
 
 //设置端口
 app.set("port", process.env.PORT || 3000);
+
+
+//假定你在多核系统上，应该能看到一些工作线程启动了。如果你想看到不同工作线程处理不同请求的证据，在路由前添加下面这个中间件：
+// app.use(function (req, res, next) {
+//     var cluster = require('cluster');
+//     if (cluster.isWorker) {
+//         console.log('Worker %d received request',cluster.worker.id);
+//     }
+// });
 
 
 app.use(function (req, res, next) {
@@ -185,18 +234,65 @@ app.get('/contest/vacation-photo', function (req, res) {
     })
 });
 
+
+
+// 确保存在目录 data
+var dataDir = __dirname + '/data';
+var vacationPhotoDir = dataDir + '/vacation-photo';
+fs.existsSync(dataDir) || fs.mkdirSync(dataDir);
+fs.existsSync(vacationPhotoDir) || fs.mkdirSync(vacationPhotoDir);
+function saveContestEntry(contestName, email, year, month, photoPath) {
+    // TODO……这个稍后再做
+}
 app.post('/contest/vacation-photo/:year/:month', function (req, res) {
     var form = new formidable.IncomingForm();
     form.parse(req, function (err, fields, files) {
         if (err) return res.redirect(303, '/error');
-        console.log('received fields:');
-        console.log(fields);
-        console.log('received files:');
-        console.log(files);
-        res.redirect(303, '/thankyou');
-    })
+        if (err) {
+            res.session.flash = {
+                type: 'danger',
+                intro: 'Oops!',
+                message: 'There was an error processing your submission. ' +
+                'Pelase try again.',
+            };
+            return res.redirect(303, '/contest/vacation-photo');
+        }
+        var photo = files.photo;
+        var dir = vacationPhotoDir + '/' + Date.now();
+        var path = dir + '/' + photo.name;
+        fs.mkdirSync(dir);
+        fs.renameSync(photo.path, dir + '/' + photo.name);
+        saveContestEntry('vacation-photo', fields.email,
+            req.params.year, req.params.month, path);
+        req.session.flash = {
+            type: 'success',
+            intro: 'Good luck!',
+            message: 'You have been entered into the contest.',
+        };
+        return res.redirect(303, '/contest/vacation-photo/entries');
+    });
 });
 
+app.get("/contest/vacation-photo/entries", function (req, res) {
+    res.render("contest/vacation-photo/entries")
+})
+
+app.get('/vacations', function (req, res) {
+    Vacation.find({ available: true }, function (err, vacations) {
+        var context = {
+            vacations: vacations.map(function (vacation) {
+                return {
+                    sku: vacation.sku,
+                    name: vacation.name,
+                    description: vacation.description,
+                    price: vacation.getDisplayPrice(),
+                    inSeason: vacation.inSeason,
+                }
+            })
+        };
+        res.render('vacations', context);
+    });
+});
 
 
 app.get('/header', function (req, res) {
@@ -210,11 +306,24 @@ app.get('/header', function (req, res) {
     }
     res.send(s);
 });
+app.get('/fail', function (req, res) {
+    throw new Error('Nope!');
+});
+
+app.get('/epic-fail', function (req, res) {
+    process.nextTick(function () {
+        throw new Error('Kaboom!');
+    });
+});
 
 app.use(function (req, res, next) {
     res.type("text/html");
     res.status("404");
     res.send("<h1 style='text-align:center;color:#ff0000'>没有找到相关页面！</h1>");
+});
+app.use(function (err, req, res, next) {
+    console.error(err.stack);
+    app.status(500).render('500');
 });
 
 switch (app.get('env')) {
